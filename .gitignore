@@ -1,0 +1,18 @@
+# Binaries produced by `go build`/`go run ./demo`
+/demo/demo
+/demo/*.exe
+
+# Test and coverage output
+*.test
+*.out
+coverage.html
+coverage.out
+
+# Local configuration and secrets
+.env
+.env.*
+
+# Editor and OS noise
+.DS_Store
+.idea/
+.vscode/
