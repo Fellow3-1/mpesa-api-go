@@ -1,0 +1,29 @@
+$ go run ./demo callback demo/testdata/stk-callback-success.json
+STK push callback
+  checkout request  ws_CO_191220191020363925
+  result            0 The service request is processed successfully.
+  customer paid     100 KES
+  receipt           NLJ7RT61SV
+  phone             254708374149
+  paid at           2019-12-19 10:21:15 EAT
+  reply with        {"ResultCode":0,"ResultDesc":"Success"}
+
+$ go run ./demo callback demo/testdata/b2c-result.json
+Asynchronous result
+  conversation      AG_20191219_00004e4e5e5a0b0c1
+  transaction       NLJ41HAY6Q
+  result            0 The service request is processed successfully.
+  TransactionAmount                250
+  TransactionReceipt               NLJ41HAY6Q
+  ReceiverPartyPublicName          254708374149 - John Doe
+  TransactionCompletedDateTime     19.12.2019 10:21:15
+  B2CUtilityAccountAvailableFunds  13497.0
+  reply with        {"ResultCode":0,"ResultDesc":"Success"}
+
+$ go run ./demo callback demo/testdata/c2b-confirmation.json
+C2B confirmation
+  receipt           RKTQDM7W6S
+  amount            150.00 KES
+  payer             254708374149 (John Doe)
+  account           INV-001
+  reply with        {"ResultCode":0,"ResultDesc":"Success"}
