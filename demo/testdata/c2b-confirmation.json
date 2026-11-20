@@ -1,0 +1,15 @@
+{
+  "TransactionType": "Pay Bill",
+  "TransID": "RKTQDM7W6S",
+  "TransTime": "20191219102115",
+  "TransAmount": "150.00",
+  "BusinessShortCode": "600638",
+  "BillRefNumber": "INV-001",
+  "InvoiceNumber": "",
+  "OrgAccountBalance": "49197.00",
+  "ThirdPartyTransID": "",
+  "MSISDN": "254708374149",
+  "FirstName": "John",
+  "MiddleName": "",
+  "LastName": "Doe"
+}

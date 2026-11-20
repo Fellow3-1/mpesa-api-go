@@ -19,6 +19,16 @@ res, err := client.STKPush(ctx, mpesa.STKPushRequest{
 })
 ```
 
+<p align="center">
+  <img src="docs/screenshots/demo-stk-push.png" width="760"
+       alt="Terminal capture: go run ./demo stk 100 0712345678 printing the Daraja JSON response, followed by an STK push query">
+</p>
+
+> Real output from the demo CLI: an STK push is sent, then queried. The two
+> commands are `go run ./demo stk 100 0712345678` and
+> `go run ./demo query ws_CO_191220191020363925`, run against the mock Daraja API
+> shipped in `demo/mockdaraja`.
+
 ## Features
 
 - **Every common Daraja payment API**: Lipa na M-Pesa (STK push) and STK query, C2B
@@ -329,6 +339,44 @@ go run ./demo stk 10 0712345678
 Run `go run ./demo` for the command list. Credentials are read from the
 environment only.
 
+### Without credentials
+
+`demo/mockdaraja` is a tiny stand-in for the Daraja API so you can try the CLI,
+inspect the exact payloads the client sends, or build against the library before
+your sandbox app is approved:
+
+```sh
+go run ./demo/mockdaraja -addr 127.0.0.1:8099 &
+
+MPESA_BASE_URL=http://127.0.0.1:8099 MPESA_APP_KEY=demo MPESA_APP_SECRET=demo \
+  MPESA_SHORT_CODE=174379 MPESA_PASS_KEY=passkey \
+  go run ./demo stk 100 0712345678
+```
+
+The mock logs every request (method, path, whether a bearer token was present)
+and returns realistic static responses.
+
+### Decoding callbacks
+
+`go run ./demo callback <file>` parses a saved callback payload with
+`ParseSTKCallback`, `ParseResultCallback` or `ParseC2BConfirmation` — whichever
+matches — and prints what the library extracted, plus the acknowledgement to
+reply with. Use `-` to read from stdin, which is handy for replaying a payload
+captured from a real callback:
+
+```sh
+go run ./demo callback demo/testdata/stk-callback-success.json
+cat payload.json | go run ./demo callback -
+```
+
+<p align="center">
+  <img src="docs/screenshots/demo-callbacks.png" width="620"
+       alt="Terminal capture: the demo decoding an STK callback, a B2C result and a C2B confirmation">
+</p>
+
+> Real output from `go run ./demo callback demo/testdata/*.json`. The sample
+> payloads live in [`demo/testdata`](demo/testdata).
+
 ## Development
 
 ```sh
@@ -336,6 +384,14 @@ make test    # go test -race ./...
 make cover   # coverage summary
 make check   # gofmt + go vet + tests
 ```
+
+The suite is table driven and runs entirely against `httptest` servers, so no
+network access or credentials are needed.
+
+<p align="center">
+  <img src="docs/screenshots/tests.png" width="760"
+       alt="Terminal capture: go vet and go test -race -cover reporting 87% coverage">
+</p>
 
 ## Versioning
 

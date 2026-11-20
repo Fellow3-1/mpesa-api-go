@@ -15,6 +15,11 @@
 //	export MPESA_INITIATOR_PASSWORD=...
 //	export MPESA_CERT_PATH=/path/to/SandboxCertificate.cer
 //
+// MPESA_BASE_URL overrides the API host, which is useful when running against a
+// local mock server:
+//
+//	export MPESA_BASE_URL=http://127.0.0.1:8099
+//
 // Then run a command, for example:
 //
 //	go run ./demo stk 10 0712345678
@@ -27,6 +32,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strconv"
@@ -45,6 +51,15 @@ func main() {
 		os.Exit(2)
 	}
 
+	command := os.Args[1]
+	args := os.Args[2:]
+
+	// Parsing a callback does not need API credentials.
+	if command == "callback" {
+		runCallback(args)
+		return
+	}
+
 	client, err := newClient()
 	if err != nil {
 		log.Fatalf("configure: %v", err)
@@ -52,9 +67,6 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-
-	command := os.Args[1]
-	args := os.Args[2:]
 
 	callbackURL := envOr("MPESA_CALLBACK_URL", "https://example.com/mpesa/callback")
 
@@ -193,6 +205,87 @@ func main() {
 	}
 }
 
+// runCallback decodes an M-Pesa callback payload from a file, or from stdin when
+// the path is "-", and prints what the library extracted from it.
+func runCallback(args []string) {
+	path := argString(args, 0, "-")
+
+	var (
+		payload []byte
+		err     error
+	)
+	if path == "-" {
+		payload, err = io.ReadAll(os.Stdin)
+	} else {
+		payload, err = os.ReadFile(path)
+	}
+	must(err)
+
+	if callback, err := mpesa.ParseSTKCallback(payload); err == nil {
+		fmt.Printf("STK push callback\n")
+		fmt.Printf("  checkout request  %s\n", callback.CheckoutRequestID)
+		fmt.Printf("  result            %d %s\n", callback.ResultCode, callback.ResultDesc)
+		switch {
+		case callback.Succeeded():
+			fmt.Printf("  customer paid     %d KES\n", callback.Metadata.Amount)
+			fmt.Printf("  receipt           %s\n", callback.Metadata.MpesaReceiptNumber)
+			fmt.Printf("  phone             %s\n", callback.Metadata.PhoneNumber)
+			fmt.Printf("  paid at           %s\n", callback.Metadata.TransactionDate.Format("2006-01-02 15:04:05 MST"))
+		case callback.Cancelled():
+			fmt.Printf("  the customer cancelled the prompt\n")
+		case callback.TimedOut():
+			fmt.Printf("  the prompt timed out\n")
+		}
+		fmt.Printf("  reply with        %s\n", ackJSON())
+		return
+	}
+
+	if callback, err := mpesa.ParseResultCallback(payload); err == nil {
+		fmt.Printf("Asynchronous result\n")
+		fmt.Printf("  conversation      %s\n", callback.ConversationID)
+		fmt.Printf("  transaction       %s\n", callback.TransactionID)
+		fmt.Printf("  result            %d %s\n", callback.ResultCode, callback.ResultDesc)
+		if callback.TimedOut() {
+			fmt.Printf("  the request timed out in the queue\n")
+		}
+		if callback.ResultParameters != nil {
+			width := 0
+			for _, param := range callback.ResultParameters.ResultParameter {
+				if len(param.Key) > width {
+					width = len(param.Key)
+				}
+			}
+			for _, param := range callback.ResultParameters.ResultParameter {
+				fmt.Printf("  %-*s  %s\n", width, param.Key, param.String())
+			}
+		}
+		fmt.Printf("  reply with        %s\n", ackJSON())
+		return
+	}
+
+	if confirmation, err := mpesa.ParseC2BConfirmation(payload); err == nil {
+		amount, _ := confirmation.Amount()
+		fmt.Printf("C2B confirmation\n")
+		fmt.Printf("  receipt           %s\n", confirmation.TransID)
+		fmt.Printf("  amount            %.2f KES\n", amount)
+		fmt.Printf("  payer             %s (%s)\n", confirmation.MSISDN, confirmation.CustomerName())
+		fmt.Printf("  account           %s\n", confirmation.BillRefNumber)
+		fmt.Printf("  reply with        %s\n", ackJSON())
+		return
+	}
+
+	log.Fatal("payload is not a recognised M-Pesa callback")
+}
+
+// ackJSON renders the acknowledgement Daraja expects for a callback.
+func ackJSON() string {
+	ack, err := json.Marshal(mpesa.SuccessAck())
+	if err != nil {
+		return ""
+	}
+	return string(ack)
+}
+
 // newClient builds a client from the environment.
 func newClient() (*mpesa.Client, error) {
 	env := mpesa.DEV
@@ -210,6 +303,10 @@ func newClient() (*mpesa.Client, error) {
 		mpesa.WithPassKey(os.Getenv("MPESA_PASS_KEY")),
 		mpesa.WithInitiatorPassword(os.Getenv("MPESA_INITIATOR_PASSWORD")),
 		mpesa.WithRetries(2),
+	}
+
+	if baseURL := os.Getenv("MPESA_BASE_URL"); baseURL != "" {
+		options = append(options, mpesa.WithBaseURL(baseURL))
 	}
 
 	if path := os.Getenv("MPESA_CERT_PATH"); path != "" {
@@ -288,10 +385,12 @@ Commands:
   balance                                 Request the account balance
   status <transactionID>                  Request a transaction status
   qr <amount> [refNo]                     Generate a dynamic QR code
+  callback <file>                         Decode a callback payload ("-" reads stdin)
 
 Environment:
   MPESA_APP_KEY, MPESA_APP_SECRET, MPESA_ENV (dev|production),
   MPESA_SHORT_CODE, MPESA_PASS_KEY, MPESA_CALLBACK_URL, MPESA_PHONE,
-  MPESA_INITIATOR_NAME, MPESA_INITIATOR_PASSWORD, MPESA_CERT_PATH
+  MPESA_INITIATOR_NAME, MPESA_INITIATOR_PASSWORD, MPESA_CERT_PATH,
+  MPESA_BASE_URL (override the API host, e.g. to use a mock server)
 `)
 }

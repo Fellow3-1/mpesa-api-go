@@ -1,0 +1,21 @@
+$ go run ./demo stk 100 0712345678
+STK push accepted (http 200):
+{
+  "CheckoutRequestID": "ws_CO_191220191020363925",
+  "CustomerMessage": "Success. Request accepted for processing",
+  "MerchantRequestID": "29115-34620561-1",
+  "ResponseCode": "0",
+  "ResponseDescription": "Success. Request accepted for processing"
+}
+
+$ go run ./demo query ws_CO_191220191020363925
+STK push query (http 200):
+{
+  "CheckoutRequestID": "ws_CO_191220191020363925",
+  "MerchantRequestID": "29115-34620561-1",
+  "ResponseCode": "0",
+  "ResponseDescription": "The service request has been accepted successsfully",
+  "ResultCode": "0",
+  "ResultDesc": "The service request is processed successfully."
+}
+
